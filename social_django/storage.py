@@ -30,16 +30,15 @@ class DjangoUserMixin(UserMixin):
                 self.extra_data_new.update(extra_data)
             else:
                 self.extra_data_new = extra_data
-            self.extra_data = self.extra_data_new
             self.save()
 
     @property
     def access_token(self):
         """Return access_token stored in extra_data or None"""
-        return self.extra_data_new.get("access_token", self.extra_data.get("access_token"))
+        return self.extra_data_new.get("access_token")
 
     def refresh_token(self, strategy, *args, **kwargs):
-        token = self.extra_data_new.get("refresh_token", self.extra_data.get("refresh_token")) or self.access_token
+        token = self.extra_data_new.get("refresh_token") or self.access_token
         backend = self.get_backend_instance(strategy)
         if token and backend and hasattr(backend, "refresh_token"):
             response = backend.refresh_token(token, *args, **kwargs)
@@ -51,11 +50,6 @@ class DjangoUserMixin(UserMixin):
         if self.extra_data_new and "expires" in self.extra_data_new:
             try:
                 return int(self.extra_data_new.get("expires"))
-            except (ValueError, TypeError):
-                return None
-        elif self.extra_data and "expires" in self.extra_data:
-            try:
-                return int(self.extra_data.get("expires"))
             except (ValueError, TypeError):
                 return None
 
@@ -84,7 +78,7 @@ class DjangoUserMixin(UserMixin):
             # expires is the time to live seconds since creation,
             # check against auth_time if present, otherwise return
             # the value
-            auth_time = self.extra_data_new.get("auth_time", self.extra_data.get("auth_time"))
+            auth_time = self.extra_data_new.get("auth_time")
             if auth_time:
                 reference = datetime.utcfromtimestamp(auth_time)
                 return (reference + timedelta(seconds=expires)) - now
@@ -282,32 +276,28 @@ class DjangoPartialMixin(PartialMixin):
 
     @property
     def args(self):
-        return self.data_new.get("args", self.data.get("args", []))
+        return self.data_new.get("args", [])
 
     @args.setter
     def args(self, value):
         self.data_new["args"] = value
-        self.data["args"] = value
 
     @property
     def kwargs(self):
-        return self.data_new.get("kwargs", self.data.get("kwargs", {}))
+        return self.data_new.get("kwargs", {})
 
     @kwargs.setter
     def kwargs(self, value):
         self.data_new["kwargs"] = value
-        self.data["kwargs"] = value
 
     def extend_kwargs(self, values):
         self.data_new["kwargs"].update(values)
-        self.data["kwargs"].update(values)
 
     @classmethod
     def prepare(cls, backend, next_step, data):
         partial = cls()
         partial.backend = backend
         partial.next_step = next_step
-        partial.data = data
         partial.data_new = data
         partial.token = cls.generate_token()
         return partial
