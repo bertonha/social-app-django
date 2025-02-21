@@ -45,6 +45,14 @@ class AbstractUserSocialAuth(models.Model, DjangoUserMixin):
         app_label = "social_django"
         abstract = True
 
+    @property
+    def extra_data(self):
+        return self.extra_data_new
+
+    @extra_data.setter
+    def extra_data(self, value):
+        self.extra_data_new = value
+
     @classmethod
     def get_social_auth(cls, provider: str, uid: Union[str, int]):
         if not isinstance(uid, str):
@@ -128,6 +136,14 @@ class Partial(models.Model, DjangoPartialMixin):
     backend = models.CharField(max_length=32)
     data_new = models.JSONField(default=dict, blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    @property
+    def data(self):
+        return self.data_new
+
+    @data.setter
+    def data(self, value):
+        self.data_new = value
 
     class Meta:
         app_label = "social_django"

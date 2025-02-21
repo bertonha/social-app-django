@@ -1,8 +1,6 @@
 """Django ORM models for Social Auth"""
 
 import base64
-import time
-from datetime import datetime, timedelta
 
 from django.core.exceptions import FieldDoesNotExist
 from django.db import router, transaction
@@ -25,65 +23,8 @@ class DjangoUserMixin(UserMixin):
         user.save()
 
     def set_extra_data(self, extra_data=None):
-        if extra_data and self.extra_data_new != extra_data:
-            if self.extra_data_new and not isinstance(self.extra_data_new, str):
-                self.extra_data_new.update(extra_data)
-            else:
-                self.extra_data_new = extra_data
+        if super().set_extra_data(extra_data):
             self.save()
-
-    @property
-    def access_token(self):
-        """Return access_token stored in extra_data or None"""
-        return self.extra_data_new.get("access_token")
-
-    def refresh_token(self, strategy, *args, **kwargs):
-        token = self.extra_data_new.get("refresh_token") or self.access_token
-        backend = self.get_backend_instance(strategy)
-        if token and backend and hasattr(backend, "refresh_token"):
-            response = backend.refresh_token(token, *args, **kwargs)
-            extra_data = backend.extra_data(self, self.uid, response, self.extra_data)
-            if self.set_extra_data(extra_data):
-                self.save()
-
-    def get_expires(self) -> int | None:
-        if self.extra_data_new and "expires" in self.extra_data_new:
-            try:
-                return int(self.extra_data_new.get("expires"))
-            except (ValueError, TypeError):
-                return None
-
-        return None
-
-    def expiration_timedelta(self):
-        """Return provider session live seconds. Returns a timedelta ready to
-        use with session.set_expiry().
-
-        If provider returns a timestamp instead of session seconds to live, the
-        timedelta is inferred from current time (using UTC timezone). None is
-        returned if there's no value stored or it's invalid.
-        """
-        expires = self.get_expires()
-        if expires is None:
-            return None
-
-
-        now = datetime.utcnow()
-
-        # Detect if expires is a timestamp
-        if expires > time.mktime(now.timetuple()):
-            # expires is a datetime, return the remaining difference
-            return datetime.utcfromtimestamp(expires) - now
-        else:
-            # expires is the time to live seconds since creation,
-            # check against auth_time if present, otherwise return
-            # the value
-            auth_time = self.extra_data_new.get("auth_time")
-            if auth_time:
-                reference = datetime.utcfromtimestamp(auth_time)
-                return (reference + timedelta(seconds=expires)) - now
-            else:
-                return timedelta(seconds=expires)
 
     @classmethod
     def allowed_to_disconnect(cls, user, backend_name, association_id=None):
@@ -273,34 +214,6 @@ class DjangoPartialMixin(PartialMixin):
         partial = cls.load(token)
         if partial:
             partial.delete()
-
-    @property
-    def args(self):
-        return self.data_new.get("args", [])
-
-    @args.setter
-    def args(self, value):
-        self.data_new["args"] = value
-
-    @property
-    def kwargs(self):
-        return self.data_new.get("kwargs", {})
-
-    @kwargs.setter
-    def kwargs(self, value):
-        self.data_new["kwargs"] = value
-
-    def extend_kwargs(self, values):
-        self.data_new["kwargs"].update(values)
-
-    @classmethod
-    def prepare(cls, backend, next_step, data):
-        partial = cls()
-        partial.backend = backend
-        partial.next_step = next_step
-        partial.data_new = data
-        partial.token = cls.generate_token()
-        return partial
 
 
 class BaseDjangoStorage(BaseStorage):
